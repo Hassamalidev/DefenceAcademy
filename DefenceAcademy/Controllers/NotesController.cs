@@ -1,39 +1,45 @@
-﻿using DefenceAcademy.Model;
-using DefenceAcademy.Repo;
+﻿using Microsoft.AspNetCore.Mvc;
+using DefenceAcademy.Model;
 using DefenceAcademy.Repo.Notes;
-using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
+using System.Collections.Generic;
 
-namespace DefenceAcademy.Controllers
+[ApiController]
+[Route("api/[controller]")]
+public class NotesController : ControllerBase
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class NotesController : ControllerBase
+    private readonly INote _noteService;
+
+    public NotesController(INote noteService)
     {
-        private readonly INote _notesService;
+        _noteService = noteService;
+    }
 
-        public NotesController(INote notesService)
-        {
-            _notesService = notesService;
-        }
+    [HttpGet("{subject}")]
+    public async Task<IActionResult> GetNotesBySubject(
+        string subject,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        var notes = await _noteService.GetNotesBySubjectAsync(subject, page, pageSize);
+        var totalCount = await _noteService.GetTotalNotesCountAsync(subject);
 
-        [HttpGet("{subject}")]
-        public async Task<IActionResult> GetNotesBySubject(string subject, int page = 1, int pageSize = 10)
-        {
-            var notes = await _notesService.GetNotesBySubjectAsync(subject, page, pageSize);
-            return Ok(notes);
-        }
+        Response.Headers.Add("X-Total-Count", totalCount.ToString());
+        return Ok(notes);
+    }
 
-        [HttpPost]
-        public async Task<IActionResult> CreateNote([FromBody] Note note)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+    [HttpPost]
+    // [Authorize(Roles = "Admin")]  // Uncomment when auth is implemented
+    public async Task<IActionResult> CreateNote([FromBody] Note note)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
 
-            var result = await _notesService.CreateNoteAsync(note);
-            if (result > 0)
-                return Ok(new { message = "Note created successfully" });
-
-            return StatusCode(500, "An error occurred while creating the note");
-        }
+        var id = await _noteService.CreateNoteAsync(note);
+        return CreatedAtAction(
+            nameof(GetNotesBySubject),
+            new { subject = note.Subject },
+            note
+        );
     }
 }
