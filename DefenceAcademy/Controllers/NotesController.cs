@@ -15,6 +15,15 @@ public class NotesController : ControllerBase
         _noteService = noteService;
     }
 
+    // Add this DTO class to your project
+    public class PaginatedResponse<T>
+    {
+        public IEnumerable<T> Items { get; set; }
+        public int TotalCount { get; set; }
+        public int PageNumber { get; set; }
+        public int PageSize { get; set; }
+        public int TotalPages => (int)Math.Ceiling(TotalCount / (double)PageSize);
+    }
     [HttpGet("{subject}")]
     public async Task<IActionResult> GetNotesBySubject(
         string subject,
@@ -24,12 +33,18 @@ public class NotesController : ControllerBase
         var notes = await _noteService.GetNotesBySubjectAsync(subject, page, pageSize);
         var totalCount = await _noteService.GetTotalNotesCountAsync(subject);
 
-        Response.Headers.Add("X-Total-Count", totalCount.ToString());
-        return Ok(notes);
+        var response = new PaginatedResponse<Note>
+        {
+            Items = notes,
+            TotalCount = totalCount,
+            PageNumber = page,
+            PageSize = pageSize
+        };
+
+        return Ok(response);
     }
 
     [HttpPost]
-    // [Authorize(Roles = "Admin")]  // Uncomment when auth is implemented
     public async Task<IActionResult> CreateNote([FromBody] Note note)
     {
         if (!ModelState.IsValid)
