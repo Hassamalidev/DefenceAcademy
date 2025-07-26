@@ -15,7 +15,6 @@ public class NotesController : ControllerBase
         _noteService = noteService;
     }
 
-    // Add this DTO class to your project
     public class PaginatedResponse<T>
     {
         public IEnumerable<T> Items { get; set; }

@@ -15,7 +15,6 @@ namespace DefenceAcademy.Controllers
             _questionService = questionService;
         }
 
-        // POST: api/question
         [HttpPost]
         public async Task<IActionResult> CreateQuestion([FromBody] Question question)
         {
@@ -29,7 +28,6 @@ namespace DefenceAcademy.Controllers
             return StatusCode(500, "Failed to create question");
         }
 
-        // GET: api/question/byCategory/1
         [HttpGet("byCategory/{categoryId}")]
         public async Task<IActionResult> GetByCategory(int categoryId)
         {
@@ -37,7 +35,6 @@ namespace DefenceAcademy.Controllers
             return Ok(questions);
         }
 
-        // GET: api/question/test?count=30&categoryId=1
         [HttpGet("test")]
         public async Task<IActionResult> GetRandomTestQuestions([FromQuery] int count = 30, [FromQuery] int categoryId = 1)
         {

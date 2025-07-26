@@ -9,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddScoped<IDbConnection>(sp => new SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddSingleton<DapperContext>();
 builder.Services.AddScoped<IQuestion, QuestionService>();
+builder.Services.AddScoped<IQuestionCategory, QuestionCategoryService>();
 builder.Services.AddScoped<INote, NoteService>();
 
 builder.Services.AddControllers();

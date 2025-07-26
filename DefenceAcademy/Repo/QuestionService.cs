@@ -12,7 +12,7 @@ namespace DefenceAcademy.Repo
         }
 
 
-        // CREATE (Insert a new question)
+      
         public async Task<int> CreateQuestionAsync(Question question)
         {
             using (var connection = await _context.createConnection())
