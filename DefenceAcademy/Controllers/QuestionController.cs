@@ -29,11 +29,15 @@ namespace DefenceAcademy.Controllers
         }
 
         [HttpGet("byCategory/{categoryId}")]
-        public async Task<IActionResult> GetByCategory(int categoryId)
+        public async Task<IActionResult> GetQuestionsByCategoryId([FromRoute] int categoryId)
         {
             var questions = await _questionService.GetQuestionsByCategoryAsync(categoryId);
+            if (questions == null || !questions.Any())
+                return NotFound("No questions found for this category.");
+
             return Ok(questions);
         }
+
 
         [HttpGet("test")]
         public async Task<IActionResult> GetRandomTestQuestions([FromQuery] int count = 30, [FromQuery] int categoryId = 1)

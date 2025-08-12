@@ -3,6 +3,7 @@ using DefenceAcademy.Model;
 using DefenceAcademy.Repo.Notes;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -23,6 +24,7 @@ public class NotesController : ControllerBase
         public int PageSize { get; set; }
         public int TotalPages => (int)Math.Ceiling(TotalCount / (double)PageSize);
     }
+
     [HttpGet("{subject}")]
     public async Task<IActionResult> GetNotesBySubject(
         string subject,
@@ -43,6 +45,17 @@ public class NotesController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("single/{id}")]
+    public async Task<IActionResult> GetNoteById(int id)
+    {
+        var note = await _noteService.GetNoteByIdAsync(id);
+        if (note == null)
+        {
+            return NotFound();
+        }
+        return Ok(note);
+    }
+
     [HttpPost]
     public async Task<IActionResult> CreateNote([FromBody] Note note)
     {
@@ -51,9 +64,51 @@ public class NotesController : ControllerBase
 
         var id = await _noteService.CreateNoteAsync(note);
         return CreatedAtAction(
-            nameof(GetNotesBySubject),
-            new { subject = note.Subject },
+            nameof(GetNoteById),
+            new { id = id },
             note
         );
     }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateNote(int id, [FromBody] Note note)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var existingNote = await _noteService.GetNoteByIdAsync(id);
+        if (existingNote == null)
+        {
+            return NotFound();
+        }
+        note.Id = id; 
+        var success = await _noteService.UpdateNoteAsync(note);
+        if (!success)
+        {
+            return StatusCode(500, "Error updating note");
+        }
+
+        var updatedNote = await _noteService.GetNoteByIdAsync(id);
+        return Ok(updatedNote);
+    }
+
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteNote(int id)
+    {
+        var existingNote = await _noteService.GetNoteByIdAsync(id);
+        if (existingNote == null)
+        {
+            return NotFound();
+        }
+
+        var success = await _noteService.DeleteNoteAsync(id);
+        if (!success)
+        {
+            return StatusCode(500, "Error deleting note");
+        }
+
+        return Ok(existingNote); 
+    }
+
 }
