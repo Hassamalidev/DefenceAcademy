@@ -1,6 +1,8 @@
 using DefenceAcademy;
+using DefenceAcademy.Model;
 using DefenceAcademy.Repo;
 using DefenceAcademy.Repo.Notes;
+using DefenceAcademy.Repo.Remarks;
 using System.Data;
 using System.Data.SqlClient;
 var builder = WebApplication.CreateBuilder(args);
@@ -11,7 +13,7 @@ builder.Services.AddSingleton<DapperContext>();
 builder.Services.AddScoped<IQuestion, QuestionService>();
 builder.Services.AddScoped<IQuestionCategory, QuestionCategoryService>();
 builder.Services.AddScoped<INote, NoteService>();
-
+builder.Services.AddScoped<IStudentRemarkRepository, StudentRemarkRepository>();
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
