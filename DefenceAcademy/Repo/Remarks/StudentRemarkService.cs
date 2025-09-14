@@ -44,14 +44,15 @@ namespace DefenceAcademy.Repo.Remarks
         public async Task<int> CreateRemarkAsync(StudentRemark remark)
         {
             var sql = @"INSERT INTO StudentRemarks (StudentName, Remark, Status, CreatedAt, IsApproved) 
-                       VALUES (@StudentName, @Remark, @Status, @CreatedAt, @IsApproved)";
+                       VALUES (@StudentName, @Remark, @Status, @CreatedAt, @IsApproved);
+                       SELECT CAST(SCOPE_IDENTITY() as int)";
 
             remark.CreatedAt = DateTime.UtcNow;
             remark.IsApproved = false;
 
             using (var connection = await _context.createConnection())
             {
-                return await connection.ExecuteAsync(sql, remark);
+                return await connection.ExecuteScalarAsync<int>(sql, remark);
             }
         }
 
@@ -70,6 +71,15 @@ namespace DefenceAcademy.Repo.Remarks
             using (var connection = await _context.createConnection())
             {
                 return await connection.ExecuteAsync(sql, new { Id = id });
+            }
+        }
+
+        public async Task<IEnumerable<StudentRemark>> GetRemarksByApprovalStatusAsync(bool isApproved)
+        {
+            var sql = "SELECT * FROM StudentRemarks WHERE IsApproved = @IsApproved ORDER BY CreatedAt DESC";
+            using (var connection = await _context.createConnection())
+            {
+                return await connection.QueryAsync<StudentRemark>(sql, new { IsApproved = isApproved });
             }
         }
     }

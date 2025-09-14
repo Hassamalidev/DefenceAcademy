@@ -4,6 +4,7 @@ using DefenceAcademy.Repo.Notes;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System;
+using Microsoft.AspNetCore.Authorization;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -55,7 +56,7 @@ public class NotesController : ControllerBase
         }
         return Ok(note);
     }
-
+    [Authorize("Admin")]
     [HttpPost]
     public async Task<IActionResult> CreateNote([FromBody] Note note)
     {
@@ -69,7 +70,7 @@ public class NotesController : ControllerBase
             note
         );
     }
-
+    [Authorize("Admin")]
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateNote(int id, [FromBody] Note note)
     {
@@ -92,7 +93,7 @@ public class NotesController : ControllerBase
         return Ok(updatedNote);
     }
 
-
+    [Authorize("Admin")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteNote(int id)
     {

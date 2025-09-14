@@ -12,5 +12,6 @@ namespace DefenceAcademy.Repo.Remarks
         Task<int> CreateRemarkAsync(StudentRemark remark);
         Task<int> DeleteRemarkAsync(int id);
         Task<int> ApproveRemarkAsync(int id);
+        Task<IEnumerable<StudentRemark>> GetRemarksByApprovalStatusAsync(bool isApproved);
     }
 }

@@ -20,41 +20,71 @@ namespace DefenceAcademy.Controllers
         public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            {
+                return BadRequest(new
+                {
+                    Error = "Invalid login data",
+                    Details = ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage))
+                });
+            }
 
-            var response = await _authService.LoginAsync(request);
-            if (response == null)
-                return Unauthorized("Invalid credentials or account not approved");
+            var result = await _authService.LoginAsync(request);
 
-            return Ok(response);
+            if (!result.Success)
+            {
+                return Unauthorized(new
+                {
+                    Error = "Login failed",
+                    ErrorType = result.ErrorType.ToString(),
+                    Message = result.ErrorMessage
+                });
+            }
+
+            return Ok(result.Response);
         }
 
         [HttpPost("register")]
         public async Task<ActionResult> Register([FromBody] RegisterRequest request)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            {
+                return BadRequest(new
+                {
+                    Error = "Invalid registration data",
+                    Details = ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage))
+                });
+            }
 
             if (request.Role != "User" && request.Role != "Admin")
-                return BadRequest("Role must be either 'User' or 'Admin'");
+            {
+                return BadRequest(new { Error = "Role must be either 'User' or 'Admin'" });
+            }
 
             var result = await _authService.RegisterAsync(request);
-            if (!result)
-                return BadRequest("Username or email already exists");
 
-            if (request.Role == "Admin")
+            if (!result.Success)
+            {
+                return BadRequest(new
+                {
+                    Error = "Registration failed",
+                    ErrorType = result.ErrorType.ToString(),
+                    Message = result.ErrorMessage
+                });
+            }
+
+            if (result.RequiresApproval)
             {
                 return Ok(new
                 {
-                    message = "Admin registration submitted. Please wait for approval via email.",
-                    requiresApproval = true
+                    Message = "Admin registration submitted. Please wait for approval via email.",
+                    RequiresApproval = true
                 });
             }
 
             return Ok(new
             {
-                message = "User registered successfully",
-                requiresApproval = false
+                Message = "User registered successfully",
+                RequiresApproval = false
             });
         }
 
@@ -132,4 +162,3 @@ namespace DefenceAcademy.Controllers
         }
     }
 }
-

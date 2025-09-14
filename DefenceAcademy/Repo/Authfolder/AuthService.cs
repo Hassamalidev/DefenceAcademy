@@ -28,89 +28,114 @@ namespace DefenceAcademy.Repo.Authfolder
             _configuration = configuration;
             _logger = logger;
 
-            _jwtSecret = _configuration["Jwt:Secret"] ?? throw new ArgumentNullException("JWT Secret not configured");
+            _jwtSecret = _configuration["Jwt:Key"] ?? throw new ArgumentNullException("JWT Secret not configured");
             _jwtIssuer = _configuration["Jwt:Issuer"] ?? "DefenceAcademy";
             _jwtAudience = _configuration["Jwt:Audience"] ?? "DefenceAcademy";
 
             if (!int.TryParse(_configuration["Jwt:ExpirationHours"] ?? "24", out _jwtExpirationHours))
             {
-                _jwtExpirationHours = 24; 
+                _jwtExpirationHours = _configuration.GetValue<int>("Jwt:ExpirationHours", 24);
             }
         }
-        public async Task<LoginResponse?> LoginAsync(LoginRequest request)
+
+        public async Task<LoginResult> LoginAsync(LoginRequest request)
         {
-            // Input validation
-            if (request == null || string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
+            if (request == null || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
             {
-                _logger.LogWarning("Login attempt with invalid credentials - Username: {Username}, Password provided: {PasswordProvided}",
-                    request?.Username ?? "null", !string.IsNullOrWhiteSpace(request?.Password));
-                return null;
+                _logger.LogWarning("Login attempt with invalid credentials - Email: {Email}", request?.Email ?? "null");
+                return new LoginResult
+                {
+                    Success = false,
+                    ErrorType = LoginErrorType.InvalidCredentials,
+                    ErrorMessage = "Email and password are required"
+                };
             }
 
             try
             {
-                _logger.LogInformation("Starting login process for user: {Username}", request.Username);
-
-                // Check if user exists
-                var user = await GetUserByUsernameAsync(request.Username);
+                _logger.LogInformation("Starting login process for email: {Email}", request.Email);
+                var user = await GetUserByEmailAsync(request.Email);
                 if (user == null)
                 {
-                    _logger.LogWarning("User not found: {Username}", request.Username);
-                    return null;
+                    _logger.LogWarning("User not found with email: {Email}", request.Email);
+                    return new LoginResult
+                    {
+                        Success = false,
+                        ErrorType = LoginErrorType.UserNotFound,
+                        ErrorMessage = "User not found"
+                    };
                 }
 
-                _logger.LogInformation("User found: {Username}, IsActive: {IsActive}, Role: {Role}, IsApproved: {IsApproved}",
-                    user.Username, user.IsActive, user.Role, user.IsApproved);
+                _logger.LogInformation("User found: {Email}, IsActive: {IsActive}, Role: {Role}, IsApproved: {IsApproved}",
+                    user.Email, user.IsActive, user.Role, user.IsApproved);
 
-                // Check if user is active
                 if (!user.IsActive)
                 {
-                    _logger.LogWarning("User is inactive: {Username}", request.Username);
-                    return null;
+                    _logger.LogWarning("Inactive user login attempt: {Email}", request.Email);
+                    return new LoginResult
+                    {
+                        Success = false,
+                        ErrorType = LoginErrorType.InactiveAccount,
+                        ErrorMessage = "Account is inactive"
+                    };
                 }
 
-                // Verify password
                 var passwordValid = VerifyPassword(request.Password, user.PasswordHash);
-                _logger.LogInformation("Password verification result for {Username}: {IsValid}", request.Username, passwordValid);
+                _logger.LogInformation("Password verification result for {Email}: {IsValid}", request.Email, passwordValid);
 
                 if (!passwordValid)
                 {
-                    _logger.LogWarning("Invalid password attempt for user: {Username}", request.Username);
-                    return null;
+                    _logger.LogWarning("Invalid password attempt for user: {Email}", request.Email);
+                    return new LoginResult
+                    {
+                        Success = false,
+                        ErrorType = LoginErrorType.InvalidCredentials,
+                        ErrorMessage = "Invalid password"
+                    };
                 }
 
-                // Check admin approval
                 if (user.Role == "Admin" && !user.IsApproved)
                 {
-                    _logger.LogWarning("Admin login attempt before approval: {Username}", request.Username);
-                    return null;
+                    _logger.LogWarning("Admin login attempt before approval: {Email}", request.Email);
+                    return new LoginResult
+                    {
+                        Success = false,
+                        ErrorType = LoginErrorType.AdminNotApproved,
+                        ErrorMessage = "Admin account pending approval"
+                    };
                 }
 
-                // Generate token
                 var token = GenerateJwtToken(user);
                 var expirationTime = DateTime.UtcNow.AddHours(_jwtExpirationHours);
 
-                _logger.LogInformation("Login successful for user: {Username}", request.Username);
+                _logger.LogInformation("Login successful for user: {Email}", request.Email);
 
-                return new LoginResponse
+                return new LoginResult
                 {
-                    Token = token,
-                    Username = user.Username,
-                    Email = user.Email,
-                    Role = user.Role,
-                    ExpiresAt = expirationTime
+                    Success = true,
+                    Response = new LoginResponse
+                    {
+                        Token = token,
+                        Username = user.Username,
+                        Email = user.Email,
+                        Role = user.Role,
+                        ExpiresAt = expirationTime
+                    }
                 };
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during login for user: {Username}", request.Username);
-                return null;
+                _logger.LogError(ex, "Error during login for email: {Email}", request.Email);
+                return new LoginResult
+                {
+                    Success = false,
+                    ErrorType = LoginErrorType.DatabaseError,
+                    ErrorMessage = "An error occurred during login"
+                };
             }
         }
 
-     
-
-        public async Task<bool> RegisterAsync(RegisterRequest request)
+        public async Task<RegistrationResult> RegisterAsync(RegisterRequest request)
         {
             if (request == null ||
                 string.IsNullOrWhiteSpace(request.Username) ||
@@ -118,12 +143,23 @@ namespace DefenceAcademy.Repo.Authfolder
                 string.IsNullOrWhiteSpace(request.Password))
             {
                 _logger.LogWarning("Registration attempt with invalid data");
-                return false;
+                return new RegistrationResult
+                {
+                    Success = false,
+                    ErrorType = RegistrationErrorType.InvalidData,
+                    ErrorMessage = "All fields are required"
+                };
             }
+
             if (!IsValidEmail(request.Email))
             {
                 _logger.LogWarning("Registration attempt with invalid email: {Email}", request.Email);
-                return false;
+                return new RegistrationResult
+                {
+                    Success = false,
+                    ErrorType = RegistrationErrorType.InvalidEmail,
+                    ErrorMessage = "Invalid email format"
+                };
             }
 
             try
@@ -132,20 +168,36 @@ namespace DefenceAcademy.Repo.Authfolder
                 if (existingUser != null)
                 {
                     _logger.LogWarning("Registration attempt with existing username: {Username}", request.Username);
-                    return false;
+                    return new RegistrationResult
+                    {
+                        Success = false,
+                        ErrorType = RegistrationErrorType.UsernameExists,
+                        ErrorMessage = "Username already exists"
+                    };
                 }
 
                 var existingEmail = await GetUserByEmailAsync(request.Email);
                 if (existingEmail != null)
                 {
                     _logger.LogWarning("Registration attempt with existing email: {Email}", request.Email);
-                    return false;
+                    return new RegistrationResult
+                    {
+                        Success = false,
+                        ErrorType = RegistrationErrorType.EmailExists,
+                        ErrorMessage = "Email already registered"
+                    };
                 }
 
-                if (!IsPasswordStrong(request.Password))
+                var passwordValidation = ValidatePasswordStrength(request.Password);
+                if (!passwordValidation.IsValid)
                 {
                     _logger.LogWarning("Registration attempt with weak password for user: {Username}", request.Username);
-                    return false;
+                    return new RegistrationResult
+                    {
+                        Success = false,
+                        ErrorType = RegistrationErrorType.WeakPassword,
+                        ErrorMessage = passwordValidation.ErrorMessage
+                    };
                 }
 
                 var passwordHash = HashPassword(request.Password);
@@ -171,18 +223,42 @@ namespace DefenceAcademy.Repo.Authfolder
                 {
                     var result = await connection.ExecuteAsync(sql, user);
 
-                    if (result > 0 && request.Role == "Admin")
+                    if (result > 0)
                     {
-                        await SendAdminApprovalEmailAsync(request.Email, request.Username, approvalToken!);
+                        if (request.Role == "Admin")
+                        {
+                            await SendAdminApprovalEmailAsync(request.Email, request.Username, approvalToken!);
+                            return new RegistrationResult
+                            {
+                                Success = true,
+                                RequiresApproval = true
+                            };
+                        }
+
+                        return new RegistrationResult
+                        {
+                            Success = true,
+                            RequiresApproval = false
+                        };
                     }
 
-                    return result > 0;
+                    return new RegistrationResult
+                    {
+                        Success = false,
+                        ErrorType = RegistrationErrorType.DatabaseError,
+                        ErrorMessage = "Failed to create user account"
+                    };
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during registration for user: {Username}", request.Username);
-                return false;
+                return new RegistrationResult
+                {
+                    Success = false,
+                    ErrorType = RegistrationErrorType.DatabaseError,
+                    ErrorMessage = "An error occurred during registration"
+                };
             }
         }
 
@@ -217,7 +293,6 @@ namespace DefenceAcademy.Repo.Authfolder
                 return result;
             }
         }
-
 
         public async Task<Auth?> GetUserByIdAsync(int id)
         {
@@ -527,26 +602,43 @@ namespace DefenceAcademy.Repo.Authfolder
             }
         }
 
-        private bool IsPasswordStrong(string password)
+        private (bool IsValid, string ErrorMessage) ValidatePasswordStrength(string password)
         {
-           
-            if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
-                return false;
+            if (string.IsNullOrWhiteSpace(password))
+                return (false, "Password is required");
+
+            if (password.Length < 8)
+                return (false, "Password must be at least 8 characters long");
 
             var hasUpperCase = false;
             var hasLowerCase = false;
             var hasDigit = false;
             var hasSpecialChar = false;
+            var specialCharacters = "!@#$%^&*()_+-=[]{}|;:,.<>?";
 
             foreach (var c in password)
             {
                 if (char.IsUpper(c)) hasUpperCase = true;
                 else if (char.IsLower(c)) hasLowerCase = true;
                 else if (char.IsDigit(c)) hasDigit = true;
-                else hasSpecialChar = true;
+                else if (specialCharacters.Contains(c)) hasSpecialChar = true;
             }
 
-            return hasUpperCase && hasLowerCase && hasDigit && hasSpecialChar;
+            var errors = new List<string>();
+
+            if (!hasUpperCase)
+                errors.Add("at least one uppercase letter");
+            if (!hasLowerCase)
+                errors.Add("at least one lowercase letter");
+            if (!hasDigit)
+                errors.Add("at least one digit");
+            if (!hasSpecialChar)
+                errors.Add("at least one special character");
+
+            if (errors.Count > 0)
+                return (false, $"Password must contain {string.Join(", ", errors)}");
+
+            return (true, string.Empty);
         }
     }
 }
